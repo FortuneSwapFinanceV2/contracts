@@ -200,8 +200,8 @@ contract MasterChef is Ownable, ReentrancyGuard {
         }
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
         uint256 tollReward = multiplier.mul(tollPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-        toll.mint(teamAddr, tollReward.div(10));
-        toll.mint(marketingAddr, tollReward.div(90));
+        toll.mint(teamAddr, tollReward.div(18));
+        toll.mint(marketingAddr, tollReward.div(18));
         toll.mint(address(this), tollReward);
         pool.accTollPerShare = pool.accTollPerShare.add(tollReward.mul(1e12).div(lpSupply));
         pool.lastRewardBlock = block.number;
@@ -268,8 +268,15 @@ contract MasterChef is Ownable, ReentrancyGuard {
                 uint256 transferTax = _amount.mul(toll.transferTaxRate()).div(10000);
                 _amount = _amount.sub(transferTax);
             }
-            user.amount = user.amount.add(_amount);
-            depositedToll = depositedToll.add(_amount);
+            if (pool.depositFeeBP > 0) {
+                uint256 depositFee = _amount.mul(pool.depositFeeBP).div(10000);
+                pool.lpToken.safeTransfer(feeAddress, depositFee);
+                user.amount = user.amount.add(_amount).sub(depositFee);
+                depositedToll = depositedToll.add(_amount).sub(depositFee);
+            }else{
+                user.amount = user.amount.add(_amount);
+                depositedToll = depositedToll.add(_amount);
+            }
         }
         user.rewardDebt = user.amount.mul(pool.accTollPerShare).div(1e12);
         emit Deposit(msg.sender, 0, _amount);
